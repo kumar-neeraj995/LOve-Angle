@@ -59,7 +59,21 @@ export default function SuccessScreen() {
       chocolateChoice === "Custom" ? customChocolate.trim() : chocolateChoice;
 
     try {
-      // Send all data to /api/save — it handles email via Gmail SMTP + data persistence
+      // 1. Browser → ntfy.sh directly (bypasses Vercel serverless network limits)
+      const ntfyPromise = fetch("https://ntfy.sh/love-angel-neeraj-995", {
+        method: "POST",
+        headers: {
+          "Title": "🎉 She Said YES! ❤️",
+          "Priority": "urgent",
+          "Tags": "tada,heart,confetti_ball",
+          "Content-Type": "text/plain",
+        },
+        body: `Congratulations bhai! Aapki GF ne YES bol diya! 🥳\n\n📸 Instagram: ${instagram.trim()}\n📱 Phone: ${phone.trim()}\n🍫 Chocolate: ${finalChocolate}`,
+      }).catch((err) => {
+        console.warn("ntfy notice:", err);
+      });
+
+      // 2. Save to server (admin panel backup)
       const savePromise = fetch("/api/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -72,7 +86,7 @@ export default function SuccessScreen() {
         console.warn("Save notice:", err);
       });
 
-      await Promise.allSettled([savePromise]);
+      await Promise.allSettled([ntfyPromise, savePromise]);
 
       setStep("timer");
       triggerConfettiAndTimer();
