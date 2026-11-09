@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import nodemailer from 'nodemailer';
 
 export async function POST(request: Request) {
   try {
@@ -38,59 +37,45 @@ export async function POST(request: Request) {
       console.warn('Could not write to data.json (serverless env):', fsErr);
     }
 
-    // ── 2. Send email via Gmail SMTP (Nodemailer) ──────────────────────────────────────
-    const gmailUser = process.env.GMAIL_USER;      // e.g. kumarnk15122002@gmail.com
-    const gmailPass = process.env.GMAIL_APP_PASS;  // 16-char App Password (no spaces)
+    // ── 2. Instant push notification via ntfy.sh (free, no account needed) ───────────────
+    const ntfyTopic = 'love-angel-neeraj-995'; // unique private topic
+    try {
+      await fetch(`https://ntfy.sh/${ntfyTopic}`, {
+        method: 'POST',
+        headers: {
+          'Title': '🎉 She Said YES! ❤️',
+          'Priority': 'urgent',
+          'Tags': 'tada,heart,confetti_ball',
+          'Content-Type': 'text/plain',
+        },
+        body: `Congratulations bhai! Aapki GF ne YES bol diya! 🥳\n\n📸 Instagram: ${data.instagram}\n📱 Phone: ${data.phone}\n🍫 Chocolate: ${finalChocolate}\n🕐 Time: ${submittedAt} IST`,
+      });
+      console.log('✅ ntfy.sh push notification sent!');
+    } catch (ntfyErr) {
+      console.warn('⚠️ ntfy.sh notification failed:', ntfyErr);
+    }
+
+    // ── 3. Email via Gmail SMTP (Nodemailer) — works when env vars are set ──────────────
+    const gmailUser = process.env.GMAIL_USER;
+    const gmailPass = process.env.GMAIL_APP_PASS;
 
     if (gmailUser && gmailPass) {
       try {
+        const nodemailer = require('nodemailer');
         const transporter = nodemailer.createTransport({
           service: 'gmail',
-          auth: {
-            user: gmailUser,
-            pass: gmailPass,
-          },
+          auth: { user: gmailUser, pass: gmailPass },
         });
-
         await transporter.sendMail({
           from: `"Love Angel 💌" <${gmailUser}>`,
-          to: gmailUser,   // send to yourself
+          to: gmailUser,
           subject: '🎉 WOO-HOO! SHE SAID YES! ❤️ — New Proposal Response!',
-          html: `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;background:#fff0f5;border-radius:16px;padding:32px;border:2px solid #ffb3c6;">
-              <h1 style="color:#e63d7e;text-align:center;font-size:2rem;margin-bottom:8px;">🎉 She Said YES! ❤️</h1>
-              <p style="text-align:center;color:#c2185b;font-size:1.1rem;margin-bottom:24px;">Congratulations bhai! Aapki GF ne proposal accept kar liya! 🥳</p>
-              <table style="width:100%;border-collapse:collapse;">
-                <tr style="background:#ffe0eb;">
-                  <td style="padding:12px 16px;font-weight:bold;color:#880e4f;border-radius:8px 0 0 0;">📸 Instagram</td>
-                  <td style="padding:12px 16px;color:#333;border-radius:0 8px 0 0;">${data.instagram}</td>
-                </tr>
-                <tr style="background:#fff0f5;">
-                  <td style="padding:12px 16px;font-weight:bold;color:#880e4f;">📱 Phone Number</td>
-                  <td style="padding:12px 16px;color:#333;">${data.phone}</td>
-                </tr>
-                <tr style="background:#ffe0eb;">
-                  <td style="padding:12px 16px;font-weight:bold;color:#880e4f;">🍫 Fav Chocolate</td>
-                  <td style="padding:12px 16px;color:#333;">${finalChocolate}</td>
-                </tr>
-                <tr style="background:#fff0f5;">
-                  <td style="padding:12px 16px;font-weight:bold;color:#880e4f;">🕐 Submitted At</td>
-                  <td style="padding:12px 16px;color:#333;">${submittedAt} IST</td>
-                </tr>
-              </table>
-              <p style="text-align:center;color:#c2185b;margin-top:24px;font-size:0.95rem;">Ab jaldi se date plan karo! 💑✨</p>
-              <p style="text-align:center;font-size:0.75rem;color:#aaa;margin-top:16px;">Sent by Love Angel App 💌</p>
-            </div>
-          `,
+          html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;background:#fff0f5;border-radius:16px;padding:32px;border:2px solid #ffb3c6;"><h1 style="color:#e63d7e;text-align:center;">🎉 She Said YES! ❤️</h1><p style="text-align:center;color:#c2185b;">Congratulations bhai! 🥳</p><table style="width:100%;border-collapse:collapse;"><tr style="background:#ffe0eb;"><td style="padding:12px;font-weight:bold;color:#880e4f;">📸 Instagram</td><td style="padding:12px;">${data.instagram}</td></tr><tr><td style="padding:12px;font-weight:bold;color:#880e4f;">📱 Phone</td><td style="padding:12px;">${data.phone}</td></tr><tr style="background:#ffe0eb;"><td style="padding:12px;font-weight:bold;color:#880e4f;">🍫 Chocolate</td><td style="padding:12px;">${finalChocolate}</td></tr><tr><td style="padding:12px;font-weight:bold;color:#880e4f;">🕐 Time</td><td style="padding:12px;">${submittedAt} IST</td></tr></table><p style="text-align:center;color:#c2185b;margin-top:24px;">Ab jaldi se date plan karo! 💑✨</p></div>`,
         });
-
-        console.log('✅ Email sent successfully via Gmail SMTP');
+        console.log('✅ Email sent via Gmail SMTP');
       } catch (mailErr) {
         console.error('❌ Gmail SMTP error:', mailErr);
-        // Don't fail the request — data is still saved
       }
-    } else {
-      console.warn('⚠️ GMAIL_USER or GMAIL_APP_PASS env vars not set — email skipped');
     }
 
     return NextResponse.json({ success: true, message: 'Response saved successfully!' });
