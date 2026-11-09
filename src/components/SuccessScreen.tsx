@@ -59,21 +59,21 @@ export default function SuccessScreen() {
       chocolateChoice === "Custom" ? customChocolate.trim() : chocolateChoice;
 
     try {
-      // 1. Browser → ntfy.sh directly (bypasses Vercel serverless network limits)
-      const ntfyPromise = fetch("https://ntfy.sh/love-angel-neeraj-995", {
-        method: "POST",
-        headers: {
-          "Title": "🎉 She Said YES! ❤️",
-          "Priority": "urgent",
-          "Tags": "tada,heart,confetti_ball",
-          "Content-Type": "text/plain",
-        },
-        body: `Congratulations bhai! Aapki GF ne YES bol diya! 🥳\n\n📸 Instagram: ${instagram.trim()}\n📱 Phone: ${phone.trim()}\n🍫 Chocolate: ${finalChocolate}`,
-      }).catch((err) => {
+      // ntfy.sh via query params (no custom headers = no CORS preflight block)
+      const msg = encodeURIComponent(
+        `Congratulations bhai! Aapki GF ne YES bol diya! 🥳\n\n📸 Instagram: ${instagram.trim()}\n📱 Phone: ${phone.trim()}\n🍫 Chocolate: ${finalChocolate}`
+      );
+      const ntfyPromise = fetch(
+        `https://ntfy.sh/love-angel-neeraj-995?title=${encodeURIComponent("🎉 She Said YES! ❤️")}&priority=urgent&tags=tada,heart`,
+        {
+          method: "POST",
+          body: `Congratulations bhai! Aapki GF ne YES bol diya! 🥳\n\n📸 Instagram: ${instagram.trim()}\n📱 Phone: ${phone.trim()}\n🍫 Chocolate: ${finalChocolate}`,
+        }
+      ).catch((err) => {
         console.warn("ntfy notice:", err);
       });
 
-      // 2. Save to server (admin panel backup)
+      // Save to server (admin panel backup)
       const savePromise = fetch("/api/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
