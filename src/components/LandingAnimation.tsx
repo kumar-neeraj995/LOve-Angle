@@ -19,7 +19,6 @@ export default function LandingAnimation({ onComplete }: LandingAnimationProps) 
   return (
     <motion.div
       onClick={onComplete}
-      onTouchEnd={onComplete}
       role="button"
       tabIndex={0}
       aria-label="Tap to begin"

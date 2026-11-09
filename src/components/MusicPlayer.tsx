@@ -1,14 +1,25 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Volume2, VolumeX, SkipForward, Music } from "lucide-react";
+import { Volume2, VolumeX, SkipForward } from "lucide-react";
 
-// Use MP3 for 100% universal compatibility across iOS (iPhone, iPad), Android, and Desktop
+// Original romantic songs
 const PLAYLIST = [
-  "/music/song1.mp3",
-  "/music/song2.mp3",
-  "/music/song3.mp3",
+  "/music/song1.webm",
+  "/music/song2.webm",
+  "/music/song3.webm"
 ];
+
+// Helper: If device cannot play webm (like some Safari/iOS versions), use the exact mp3 fallback
+function getSongUrl(url: string) {
+  if (typeof window !== "undefined") {
+    const a = document.createElement("audio");
+    if (!a.canPlayType('audio/webm') && a.canPlayType('audio/mpeg')) {
+      return url.replace(".webm", ".mp3");
+    }
+  }
+  return url;
+}
 
 export default function MusicPlayer() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -16,22 +27,23 @@ export default function MusicPlayer() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Initialize audio element once
+    // Initialize audio element with original song
     if (!audioRef.current) {
-      const audio = new Audio(PLAYLIST[0]);
-      audio.preload = "auto";
-      audio.loop = false;
-      audioRef.current = audio;
-
-      const handleEnded = () => {
+      const initialSrc = getSongUrl(PLAYLIST[0]);
+      audioRef.current = new Audio(initialSrc);
+      audioRef.current.loop = false;
+      
+      const onEnded = () => {
         playNextSong();
       };
 
-      audio.addEventListener("ended", handleEnded);
+      audioRef.current.addEventListener("ended", onEnded);
 
       return () => {
-        audio.removeEventListener("ended", handleEnded);
-        audio.pause();
+        if (audioRef.current) {
+          audioRef.current.removeEventListener("ended", onEnded);
+          audioRef.current.pause();
+        }
       };
     }
   }, []);
@@ -40,7 +52,7 @@ export default function MusicPlayer() {
     setCurrentSongIndex((prev) => {
       const nextIndex = (prev + 1) % PLAYLIST.length;
       if (audioRef.current) {
-        audioRef.current.src = PLAYLIST[nextIndex];
+        audioRef.current.src = getSongUrl(PLAYLIST[nextIndex]);
         if (isPlaying) {
           audioRef.current.play().catch(() => {});
         }
@@ -50,10 +62,11 @@ export default function MusicPlayer() {
   };
 
   useEffect(() => {
+    // Play or Pause based on state
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.play().catch((err) => {
-          console.warn("Audio autoplay blocked by browser:", err);
+          console.log("Autoplay blocked, waiting for interaction:", err);
           setIsPlaying(false);
         });
       } else {
@@ -62,41 +75,31 @@ export default function MusicPlayer() {
     }
   }, [isPlaying, currentSongIndex]);
 
-  // Audio unlock on user touch/click for Apple iOS and Android policies
   useEffect(() => {
-    const unlockAudio = () => {
+    // Autoplay on first user interaction anywhere
+    const handleFirstInteraction = () => {
       if (!isPlaying && audioRef.current) {
-        audioRef.current
-          .play()
-          .then(() => setIsPlaying(true))
-          .catch(() => {});
+        setIsPlaying(true);
       }
-      // Remove listeners once triggered
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("touchend", unlockAudio);
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("touchstart", handleFirstInteraction);
     };
 
-    window.addEventListener("touchstart", unlockAudio, { passive: true });
-    window.addEventListener("touchend", unlockAudio, { passive: true });
-    window.addEventListener("pointerdown", unlockAudio, { passive: true });
-    window.addEventListener("click", unlockAudio);
+    window.addEventListener("click", handleFirstInteraction, { once: true });
+    window.addEventListener("touchstart", handleFirstInteraction, { once: true });
 
     return () => {
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("touchend", unlockAudio);
-      window.removeEventListener("pointerdown", unlockAudio);
-      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("click", handleFirstInteraction);
+      window.removeEventListener("touchstart", handleFirstInteraction);
     };
   }, [isPlaying]);
 
-  const toggleMute = (e: React.MouseEvent | React.TouchEvent) => {
+  const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsPlaying((prev) => !prev);
   };
 
-  const skipSong = (e: React.MouseEvent | React.TouchEvent) => {
+  const skipSong = (e: React.MouseEvent) => {
     e.stopPropagation();
     playNextSong();
     setIsPlaying(true);
@@ -107,19 +110,17 @@ export default function MusicPlayer() {
       {isPlaying && (
         <button
           onClick={skipSong}
-          onTouchEnd={skipSong}
-          className="p-2.5 sm:p-3 bg-white/70 hover:bg-white/90 active:scale-95 backdrop-blur-md rounded-full shadow-md border border-pink-200 text-pink-600 transition-all cursor-pointer"
+          className="p-2 sm:p-2.5 bg-white/70 hover:bg-white/90 active:scale-95 backdrop-blur-md rounded-full shadow-md border border-pink-200 text-pink-600 transition-all cursor-pointer"
           aria-label="Next Song"
           title="Next Song"
         >
           <SkipForward size={18} className="sm:w-5 sm:h-5" />
         </button>
       )}
-
+      
       <button
         onClick={toggleMute}
-        onTouchEnd={toggleMute}
-        className={`p-3 sm:p-4 rounded-full backdrop-blur-md shadow-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
+        className={`p-3.5 sm:p-4 rounded-full backdrop-blur-md shadow-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
           isPlaying
             ? "bg-white/80 border-pink-300 text-pink-600 shadow-[0_0_20px_rgba(255,182,193,0.7)] animate-pulse"
             : "bg-white/60 border-pink-100 text-pink-400 hover:bg-white/80"
@@ -128,9 +129,9 @@ export default function MusicPlayer() {
         title={isPlaying ? "Mute Music" : "Play Music"}
       >
         {isPlaying ? (
-          <Volume2 size={22} className="sm:w-6 sm:h-6" />
+          <Volume2 size={24} className="sm:w-6 sm:h-6" />
         ) : (
-          <VolumeX size={22} className="sm:w-6 sm:h-6" />
+          <VolumeX size={24} className="sm:w-6 sm:h-6" />
         )}
       </button>
     </div>
