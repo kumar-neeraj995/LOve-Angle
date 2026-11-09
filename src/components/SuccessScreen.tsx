@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
+import { Heart, Sparkles, Send, Check } from "lucide-react";
 
 export default function SuccessScreen() {
   const [step, setStep] = useState<"contact" | "chocolate" | "timer">("contact");
@@ -47,66 +48,97 @@ export default function SuccessScreen() {
       return;
     }
     if (chocolateChoice === "Custom" && !customChocolate.trim()) {
-      setError("Please tell me which chocolate you want! ❤️");
+      setError("Please write the name of your favorite chocolate! ❤️");
       return;
     }
 
     setLoading(true);
     setError("");
 
-    const finalChocolate = chocolateChoice === "Custom" ? customChocolate : chocolateChoice;
+    const finalChocolate =
+      chocolateChoice === "Custom" ? customChocolate.trim() : chocolateChoice;
 
     try {
-      const res = await fetch("https://formsubmit.co/ajax/kumarnk15122002@gmail.com", {
+      // Send to server API route first
+      const saveRes = await fetch("/api/save", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          _subject: "🎉 WOO-HOO! SHE SAID YES! ❤️ (Proposal Response)",
-          _template: "box",
-          Instagram_ID: instagram,
-          Phone_Number: phone,
-          Favorite_Chocolate: finalChocolate,
-          Message: "Congratulation Bhai! Aapki GF ne YES bol diya hai! ❤️🎉 Ab jaldi se date plan karo!",
+          instagram: instagram.trim(),
+          phone: phone.trim(),
+          chocolate: finalChocolate,
         }),
       });
 
-      if (res.ok) {
-        setStep("timer");
-        triggerConfettiAndTimer();
-      } else {
-        setError("Failed to connect. Please try again 🥺");
+      // Direct fallback to FormSubmit in case serverless is delayed
+      if (!saveRes.ok) {
+        await fetch("https://formsubmit.co/ajax/kumarnk15122002@gmail.com", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            _subject: "🎉 SHE SAID YES! ❤️ (Proposal Response)",
+            Instagram_ID: instagram.trim(),
+            Phone_Number: phone.trim(),
+            Favorite_Chocolate: finalChocolate,
+          }),
+        }).catch(() => {});
       }
+
+      setStep("timer");
+      triggerConfettiAndTimer();
     } catch (err) {
-      setError("Could not connect. Please try again ❤️");
+      // Even if network hiccups, celebrate her saying YES
+      setStep("timer");
+      triggerConfettiAndTimer();
     } finally {
       setLoading(false);
     }
   };
 
   const triggerConfettiAndTimer = () => {
-    const duration = 5 * 1000;
+    const duration = 4.5 * 1000;
     const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+    const defaults = {
+      startVelocity: 28,
+      spread: 360,
+      ticks: 50,
+      zIndex: 100,
+      disableForReducedMotion: true,
+    };
+    const randomInRange = (min: number, max: number) =>
+      Math.random() * (max - min) + min;
 
     const interval: any = setInterval(function () {
       const timeLeft = animationEnd - Date.now();
       if (timeLeft <= 0) return clearInterval(interval);
-      const particleCount = 50 * (timeLeft / duration);
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
-    }, 250);
+      // Balanced particle count for smooth mobile 60fps
+      const particleCount = Math.floor(35 * (timeLeft / duration));
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.15, 0.35), y: Math.random() - 0.2 },
+      });
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.65, 0.85), y: Math.random() - 0.2 },
+      });
+    }, 280);
 
     const startTimeStr = Date.now().toString();
-    localStorage.setItem("proposal_yes_time", startTimeStr);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("proposal_yes_time", startTimeStr);
+      } catch (e) {}
+    }
     const startTime = parseInt(startTimeStr, 10);
 
     const timerInterval = setInterval(() => {
       const now = Date.now();
-      const difference = now - startTime;
+      const difference = Math.max(0, now - startTime);
       setTimeSince({
         days: Math.floor(difference / (1000 * 60 * 60 * 24)),
         hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
@@ -120,52 +152,28 @@ export default function SuccessScreen() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
+      initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 1, ease: "backOut" }}
-      className="glass-dark p-8 md:p-12 rounded-3xl max-w-2xl w-[95%] mx-auto text-center relative z-20 text-white overflow-hidden"
+      transition={{ duration: 0.7, ease: "easeOut" }}
+      className="glass-dark p-5 sm:p-8 md:p-10 rounded-3xl max-w-lg md:max-w-xl w-full mx-auto text-center relative z-20 text-white overflow-hidden shadow-2xl border border-white/20 select-none"
     >
-      {/* Background Chocolates for Chocolate Step */}
-      <AnimatePresence>
-        {step === "chocolate" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 pointer-events-none overflow-hidden"
-          >
-            {[...Array(15)].map((_, i) => (
-              <motion.div
-                key={i}
-                initial={{ y: -50, x: Math.random() * 800 - 400, rotate: 0 }}
-                animate={{ y: 800, rotate: 360, x: Math.random() * 800 - 400 }}
-                transition={{ duration: Math.random() * 5 + 5, repeat: Infinity, ease: "linear", delay: Math.random() * 5 }}
-                className="absolute text-4xl"
-                style={{ left: "50%", top: "-10%" }}
-              >
-                {["🍫", "🍬", "🍩", "🍪", "🍭"][Math.floor(Math.random() * 5)]}
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <motion.div
-        animate={{ scale: [1, 1.05, 1], rotate: [0, -2, 2, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        animate={{ scale: [1, 1.06, 1] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        className="mb-2 sm:mb-4"
       >
-        <h1 className="text-5xl md:text-7xl font-bold mb-6 text-pink-300 drop-shadow-[0_0_15px_rgba(255,183,197,0.8)]">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-pink-300 drop-shadow-[0_0_20px_rgba(255,183,197,0.85)] tracking-wide">
           Yayyyyy!! ❤️
         </h1>
       </motion.div>
 
-      <p className="text-2xl md:text-3xl mb-8 font-semibold opacity-90 relative z-10">
+      <p className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-pink-100">
         I knew you'd say YES!
       </p>
 
       {step !== "timer" && (
-        <div className="w-40 h-40 md:w-56 md:h-56 mx-auto mb-8 bg-white/20 rounded-full flex items-center justify-center border-4 border-pink-300/50 shadow-[0_0_30px_rgba(255,183,197,0.4)] overflow-hidden relative z-10">
-          <div className="text-6xl animate-pulse">👩‍❤️‍👨</div>
+        <div className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-5 sm:mb-6 bg-white/15 rounded-full flex items-center justify-center border-2 sm:border-4 border-pink-300/40 shadow-[0_0_25px_rgba(255,183,197,0.35)] shrink-0">
+          <span className="text-4xl sm:text-5xl animate-bounce">👩‍❤️‍👨</span>
         </div>
       )}
 
@@ -173,43 +181,62 @@ export default function SuccessScreen() {
         {step === "contact" && (
           <motion.div
             key="contact-form"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 50 }}
-            className="bg-white/10 backdrop-blur-md rounded-2xl p-8 md:p-10 border border-white/20 text-left relative z-10"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl p-5 sm:p-7 border border-white/20 text-left"
           >
-            <p className="text-lg md:text-xl text-pink-200 mb-8 font-medium text-center">
-              Now that you're mine... can I get your Instagram ID and Phone Number to plan our first beautiful date? 🥺✨
+            <p className="text-sm sm:text-base text-pink-200 mb-5 font-medium text-center leading-relaxed">
+              Now that you're mine... can I get your details so I can plan our first beautiful date? 🥺✨
             </p>
-            <form onSubmit={handleContactSubmit} className="flex flex-col gap-6">
-              <div className="flex flex-col gap-2">
-                <label className="block text-md font-semibold text-pink-100 ml-2">Instagram ID</label>
+
+            <form onSubmit={handleContactSubmit} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs sm:text-sm font-semibold text-pink-100 ml-1">
+                  Instagram ID
+                </label>
                 <input
                   type="text"
-                  placeholder="@your_beautiful_id"
+                  placeholder="@your_instagram_id"
                   value={instagram}
                   onChange={(e) => setInstagram(e.target.value)}
-                  className="w-full px-6 py-4 rounded-xl bg-white/20 border border-pink-300/30 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-lg"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="w-full px-4 sm:px-5 py-3.5 rounded-xl bg-white/20 border border-pink-300/30 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-base sm:text-lg touch-manipulation"
                   required
                 />
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="block text-md font-semibold text-pink-100 ml-2">Phone Number</label>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs sm:text-sm font-semibold text-pink-100 ml-1">
+                  Phone Number
+                </label>
                 <input
-                  type="text"
-                  placeholder="10-digit number"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  autoComplete="tel"
+                  placeholder="10-digit mobile number"
                   value={phone}
                   onChange={handlePhoneChange}
-                  className="w-full px-6 py-4 rounded-xl bg-white/20 border border-pink-300/30 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all tracking-wider text-lg"
+                  className="w-full px-4 sm:px-5 py-3.5 rounded-xl bg-white/20 border border-pink-300/30 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-base sm:text-lg tracking-wider touch-manipulation"
                   required
                 />
               </div>
-              {error && <p className="text-red-300 text-sm font-medium mt-1 animate-bounce text-center">{error}</p>}
+
+              {error && (
+                <p className="text-red-300 text-xs sm:text-sm font-semibold mt-1 text-center bg-red-500/20 py-2 rounded-lg border border-red-400/30">
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
-                className="mt-6 w-full py-5 px-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-bold text-lg rounded-xl shadow-lg transition-transform hover:-translate-y-1 active:translate-y-0 text-center leading-snug"
+                className="mt-3 w-full py-4 px-4 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 active:scale-95 text-white font-extrabold text-base sm:text-lg rounded-xl shadow-lg transition-all cursor-pointer text-center leading-snug touch-manipulation min-h-[50px]"
               >
-                Go to next step with your permission okay ❤️
+                Continue to Next Step ❤️
               </button>
             </form>
           </motion.div>
@@ -218,37 +245,41 @@ export default function SuccessScreen() {
         {step === "chocolate" && (
           <motion.div
             key="chocolate-form"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 50 }}
-            className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 text-left relative z-10"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.3 }}
+            className="bg-white/10 backdrop-blur-md rounded-2xl p-5 sm:p-7 border border-white/20 text-left"
           >
-            <p className="text-lg md:text-xl text-pink-200 mb-6 font-medium text-center">
-              One last important question! What is your favorite chocolate? 🍫✨
+            <p className="text-sm sm:text-base text-pink-200 mb-4 sm:mb-5 font-medium text-center leading-relaxed">
+              One last sweet question! What is your favorite chocolate? 🍫✨
             </p>
-            <form onSubmit={handleFinalSubmit} className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["Dairy Milk", "Kit Kat", "Custom"].map((choc) => (
-                  <motion.button
+
+            <form onSubmit={handleFinalSubmit} className="flex flex-col gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                {[
+                  { id: "Dairy Milk", label: "🍫 Dairy Milk" },
+                  { id: "Kit Kat", label: "🍬 Kit Kat" },
+                  { id: "Custom", label: "✍️ Other" },
+                ].map((item) => (
+                  <button
                     type="button"
-                    key={choc}
+                    key={item.id}
                     onClick={() => {
-                      setChocolateChoice(choc);
+                      setChocolateChoice(item.id);
                       setError("");
                     }}
-                    animate={{
-                      scale: chocolateChoice === choc ? 1.05 : 1,
-                      boxShadow: chocolateChoice === choc ? "0 0 15px rgba(255, 183, 197, 0.8)" : "none",
-                    }}
-                    whileHover={{ scale: 1.02 }}
-                    className={`py-4 rounded-xl font-bold transition-colors border-2 ${
-                      chocolateChoice === choc
-                        ? "bg-pink-500/50 border-pink-400 text-white animate-pulse"
-                        : "bg-white/10 border-white/20 text-pink-100 hover:bg-white/20"
+                    className={`py-3.5 px-3 rounded-xl font-bold text-sm sm:text-base transition-all border cursor-pointer active:scale-95 touch-manipulation flex items-center justify-center gap-1.5 min-h-[48px] ${
+                      chocolateChoice === item.id
+                        ? "bg-pink-500/80 border-pink-300 text-white shadow-[0_0_15px_rgba(255,183,197,0.7)]"
+                        : "bg-white/15 border-white/25 text-pink-100 hover:bg-white/25"
                     }`}
                   >
-                    {choc === "Dairy Milk" ? "🍫 Dairy Milk" : choc === "Kit Kat" ? "🍬 Kit Kat" : "✍️ Write My Own"}
-                  </motion.button>
+                    <span>{item.label}</span>
+                    {chocolateChoice === item.id && (
+                      <Check size={16} className="text-white" />
+                    )}
+                  </button>
                 ))}
               </div>
 
@@ -262,23 +293,28 @@ export default function SuccessScreen() {
                   >
                     <input
                       type="text"
-                      placeholder="Type your favorite chocolate..."
+                      placeholder="Type your favorite chocolate name..."
                       value={customChocolate}
                       onChange={(e) => setCustomChocolate(e.target.value)}
-                      className="w-full px-5 py-3 rounded-xl bg-white/20 border border-pink-300/30 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all mt-2"
+                      className="w-full px-4 sm:px-5 py-3.5 rounded-xl bg-white/20 border border-pink-300/30 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all text-base sm:text-lg mt-2 touch-manipulation"
+                      autoFocus
                     />
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {error && <p className="text-red-300 text-sm font-medium mt-1 animate-bounce text-center">{error}</p>}
-              
+              {error && (
+                <p className="text-red-300 text-xs sm:text-sm font-semibold mt-1 text-center bg-red-500/20 py-2 rounded-lg border border-red-400/30">
+                  {error}
+                </p>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-4 w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-bold text-lg rounded-xl shadow-lg transition-transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-3 w-full py-4 px-4 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-400 hover:to-rose-400 active:scale-95 text-white font-extrabold text-base sm:text-lg rounded-xl shadow-lg transition-all cursor-pointer text-center leading-snug touch-manipulation min-h-[50px] disabled:opacity-60"
               >
-                {loading ? "Sending my love..." : "Submit 💌"}
+                {loading ? "Saving with love..." : "Lock In Forever 💌"}
               </button>
             </form>
           </motion.div>
@@ -287,28 +323,33 @@ export default function SuccessScreen() {
         {step === "timer" && (
           <motion.div
             key="timer"
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center relative z-10"
+            className="flex flex-col items-center"
           >
-            <h2 className="text-3xl font-bold mb-8 text-pink-200">
+            <h2 className="text-2xl sm:text-3xl font-extrabold mb-5 sm:mb-6 text-pink-200">
               ❤️ Forever Starts Today ❤️
             </h2>
 
-            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 w-full">
-              <p className="text-sm uppercase tracking-widest text-pink-200 mb-4 font-bold">
+            <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-white/20 w-full">
+              <p className="text-xs uppercase tracking-widest text-pink-200 mb-4 font-bold">
                 Time Since You Said Yes
               </p>
-              <div className="flex justify-center gap-4 md:gap-8 text-center">
+              <div className="grid grid-cols-4 gap-2 sm:gap-4 text-center">
                 <TimeUnit value={timeSince.days} label="Days" />
                 <TimeUnit value={timeSince.hours} label="Hours" />
-                <TimeUnit value={timeSince.minutes} label="Minutes" />
-                <TimeUnit value={timeSince.seconds} label="Seconds" />
+                <TimeUnit value={timeSince.minutes} label="Mins" />
+                <TimeUnit value={timeSince.seconds} label="Secs" />
               </div>
             </div>
-            
-            <p className="mt-8 text-sm opacity-60">
-              {new Date().toLocaleDateString("en-US", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+
+            <p className="mt-5 sm:mt-6 text-xs sm:text-sm text-pink-200/80">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
             </p>
           </motion.div>
         )}
@@ -319,11 +360,11 @@ export default function SuccessScreen() {
 
 function TimeUnit({ value, label }: { value: number; label: string }) {
   return (
-    <div className="flex flex-col items-center">
-      <div className="text-3xl md:text-5xl font-bold tabular-nums w-12 md:w-20">
+    <div className="flex flex-col items-center justify-center p-2 rounded-xl bg-white/5 border border-white/10">
+      <div className="text-2xl sm:text-3xl md:text-4xl font-extrabold tabular-nums text-pink-300">
         {value.toString().padStart(2, "0")}
       </div>
-      <div className="text-xs md:text-sm uppercase tracking-wider opacity-70 mt-1">
+      <div className="text-[10px] sm:text-xs uppercase tracking-wider text-pink-200/80 font-bold mt-1">
         {label}
       </div>
     </div>

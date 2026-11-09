@@ -12,38 +12,49 @@ interface CursorTrail {
 
 export default function CustomCursor() {
   const [trail, setTrail] = useState<CursorTrail[]>([]);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
+    // Only enable on real pointer / mouse devices (Desktop / Laptop).
+    // Touch devices (iPhone, iPad, Android phones & tablets) will skip this entirely.
+    if (typeof window !== "undefined") {
+      const isFinePointer = window.matchMedia("(pointer: fine) and (hover: hover)").matches;
+      if (!isFinePointer) return;
+      setEnabled(true);
+    }
+
     let idCounter = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
 
-      // Only add trail item occasionally to prevent performance issues
-      if (Math.random() > 0.5) {
+      // Only add trail item occasionally to prevent memory/render pressure
+      if (Math.random() > 0.6) {
         setTrail((prev) => [
-          ...prev.slice(-15), // Keep max 15 particles
+          ...prev.slice(-10), // Keep max 10 particles
           { id: idCounter++, x: e.clientX, y: e.clientY },
         ]);
       }
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mousemove", handleMouseMove, { passive: true });
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };
   }, []);
 
-  // Remove particles over time
+  // Slowly clean up trail particles
   useEffect(() => {
-    if (trail.length === 0) return;
+    if (!enabled || trail.length === 0) return;
     const interval = setInterval(() => {
       setTrail((prev) => prev.slice(1));
-    }, 100);
+    }, 120);
     return () => clearInterval(interval);
-  }, [trail]);
+  }, [enabled, trail]);
+
+  if (!enabled) return null;
 
   return (
     <>
@@ -54,12 +65,12 @@ export default function CustomCursor() {
           x: mousePos.x - 12,
           y: mousePos.y - 12,
         }}
-        transition={{ type: "tween", ease: "backOut", duration: 0.1 }}
+        transition={{ type: "tween", ease: "backOut", duration: 0.08 }}
       >
         <Heart size={24} fill="currentColor" strokeWidth={0} />
       </motion.div>
 
-      {/* The trail */}
+      {/* The trailing hearts */}
       <AnimatePresence>
         {trail.map((item) => (
           <motion.div
@@ -68,13 +79,13 @@ export default function CustomCursor() {
             animate={{
               opacity: 0,
               scale: 0.2,
-              y: item.y + 20, // Drift downwards slightly
+              y: item.y + 18,
             }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
             className="fixed top-0 left-0 pointer-events-none z-40 text-pink-300 drop-shadow-[0_0_5px_rgba(255,183,197,0.6)]"
           >
-            <Heart size={16} fill="currentColor" strokeWidth={0} />
+            <Heart size={14} fill="currentColor" strokeWidth={0} />
           </motion.div>
         ))}
       </AnimatePresence>

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Volume2, VolumeX, SkipForward } from "lucide-react";
+import { Volume2, VolumeX, SkipForward, Music } from "lucide-react";
 
+// Use MP3 for 100% universal compatibility across iOS (iPhone, iPad), Android, and Desktop
 const PLAYLIST = [
-  "/music/song1.webm",
-  "/music/song2.webm",
-  "/music/song3.webm"
+  "/music/song1.mp3",
+  "/music/song2.mp3",
+  "/music/song3.mp3",
 ];
 
 export default function MusicPlayer() {
@@ -17,19 +18,22 @@ export default function MusicPlayer() {
   useEffect(() => {
     // Initialize audio element once
     if (!audioRef.current) {
-      audioRef.current = new Audio(PLAYLIST[0]);
-      audioRef.current.loop = false;
-      
-      // Auto play next song when current finishes
-      audioRef.current.addEventListener("ended", playNextSong);
+      const audio = new Audio(PLAYLIST[0]);
+      audio.preload = "auto";
+      audio.loop = false;
+      audioRef.current = audio;
+
+      const handleEnded = () => {
+        playNextSong();
+      };
+
+      audio.addEventListener("ended", handleEnded);
+
+      return () => {
+        audio.removeEventListener("ended", handleEnded);
+        audio.pause();
+      };
     }
-    
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener("ended", playNextSong);
-        audioRef.current.pause();
-      }
-    };
   }, []);
 
   const playNextSong = () => {
@@ -38,7 +42,7 @@ export default function MusicPlayer() {
       if (audioRef.current) {
         audioRef.current.src = PLAYLIST[nextIndex];
         if (isPlaying) {
-          audioRef.current.play().catch(console.error);
+          audioRef.current.play().catch(() => {});
         }
       }
       return nextIndex;
@@ -46,11 +50,10 @@ export default function MusicPlayer() {
   };
 
   useEffect(() => {
-    // Play or Pause based on state
     if (audioRef.current) {
       if (isPlaying) {
         audioRef.current.play().catch((err) => {
-          console.error("Autoplay prevented:", err);
+          console.warn("Audio autoplay blocked by browser:", err);
           setIsPlaying(false);
         });
       } else {
@@ -59,48 +62,76 @@ export default function MusicPlayer() {
     }
   }, [isPlaying, currentSongIndex]);
 
+  // Audio unlock on user touch/click for Apple iOS and Android policies
   useEffect(() => {
-    // Attempt autoplay on first interaction
-    const handleInteraction = () => {
+    const unlockAudio = () => {
       if (!isPlaying && audioRef.current) {
-        setIsPlaying(true);
+        audioRef.current
+          .play()
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
       }
-      document.removeEventListener("click", handleInteraction);
+      // Remove listeners once triggered
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("touchend", unlockAudio);
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
     };
 
-    document.addEventListener("click", handleInteraction);
-    return () => document.removeEventListener("click", handleInteraction);
+    window.addEventListener("touchstart", unlockAudio, { passive: true });
+    window.addEventListener("touchend", unlockAudio, { passive: true });
+    window.addEventListener("pointerdown", unlockAudio, { passive: true });
+    window.addEventListener("click", unlockAudio);
+
+    return () => {
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("touchend", unlockAudio);
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
+    };
   }, [isPlaying]);
 
-  const toggleMute = (e: React.MouseEvent) => {
+  const toggleMute = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    setIsPlaying(!isPlaying);
+    setIsPlaying((prev) => !prev);
   };
 
-  const skipSong = (e: React.MouseEvent) => {
+  const skipSong = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     playNextSong();
-    setIsPlaying(true); // Ensure it starts playing if it was paused
+    setIsPlaying(true);
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 flex items-center gap-2 sm:gap-3 select-none">
       {isPlaying && (
         <button
           onClick={skipSong}
-          className="p-2 bg-white/20 backdrop-blur-md rounded-full shadow-lg border border-white/40 text-pink-600 hover:bg-white/40 transition-colors"
+          onTouchEnd={skipSong}
+          className="p-2.5 sm:p-3 bg-white/70 hover:bg-white/90 active:scale-95 backdrop-blur-md rounded-full shadow-md border border-pink-200 text-pink-600 transition-all cursor-pointer"
           aria-label="Next Song"
+          title="Next Song"
         >
-          <SkipForward size={20} />
+          <SkipForward size={18} className="sm:w-5 sm:h-5" />
         </button>
       )}
-      
+
       <button
         onClick={toggleMute}
-        className="p-4 bg-white/30 backdrop-blur-md rounded-full shadow-[0_0_15px_rgba(255,183,197,0.5)] border border-pink-200 text-pink-600 hover:bg-white/50 transition-all hover:scale-105"
+        onTouchEnd={toggleMute}
+        className={`p-3 sm:p-4 rounded-full backdrop-blur-md shadow-lg border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
+          isPlaying
+            ? "bg-white/80 border-pink-300 text-pink-600 shadow-[0_0_20px_rgba(255,182,193,0.7)] animate-pulse"
+            : "bg-white/60 border-pink-100 text-pink-400 hover:bg-white/80"
+        }`}
         aria-label="Toggle Music"
+        title={isPlaying ? "Mute Music" : "Play Music"}
       >
-        {isPlaying ? <Volume2 size={26} /> : <VolumeX size={26} />}
+        {isPlaying ? (
+          <Volume2 size={22} className="sm:w-6 sm:h-6" />
+        ) : (
+          <VolumeX size={22} className="sm:w-6 sm:h-6" />
+        )}
       </button>
     </div>
   );

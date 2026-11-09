@@ -11,50 +11,52 @@ const compliments = [
   "❤️ Your Smile Lights Up My Day",
   "❤️ I Love Your Laugh",
   "❤️ You're So Special To Me",
+  "❤️ Pure Magic",
 ];
 
 export default function ComplimentToast() {
-  const [currentToast, setCurrentToast] = useState<{ id: number; text: string; top: string; left: string } | null>(null);
+  const [currentToast, setCurrentToast] = useState<{
+    id: number;
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     let idCounter = 0;
 
     const interval = setInterval(() => {
-      // 30% chance to show a compliment every 5 seconds
-      if (Math.random() > 0.3) {
-        const text = compliments[Math.floor(Math.random() * compliments.length)];
-        
-        // Random position on screen, keeping it somewhat centered
-        const top = `${Math.random() * 60 + 20}%`;
-        const left = `${Math.random() * 60 + 20}%`;
+      // 35% chance to show a compliment every 6 seconds
+      if (Math.random() > 0.35) {
+        const text =
+          compliments[Math.floor(Math.random() * compliments.length)];
 
-        setCurrentToast({ id: idCounter++, text, top, left });
+        setCurrentToast({ id: idCounter++, text });
 
         // Remove toast after 3 seconds
         setTimeout(() => {
           setCurrentToast(null);
         }, 3000);
       }
-    }, 5000);
+    }, 6000);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <AnimatePresence>
-      {currentToast && (
-        <motion.div
-          key={currentToast.id}
-          initial={{ opacity: 0, y: 20, scale: 0.8 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.8 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="fixed pointer-events-none z-50 px-6 py-3 bg-white/70 backdrop-blur-md text-pink-600 font-bold rounded-full shadow-lg border border-pink-200"
-          style={{ top: currentToast.top, left: currentToast.left, transform: "translate(-50%, -50%)" }}
-        >
-          {currentToast.text}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div className="fixed top-3 sm:top-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none w-full max-w-sm px-4 flex justify-center">
+      <AnimatePresence>
+        {currentToast && (
+          <motion.div
+            key={currentToast.id}
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -15, scale: 0.9 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="px-5 py-2 sm:py-2.5 bg-white/90 backdrop-blur-md text-pink-600 font-extrabold text-xs sm:text-sm rounded-full shadow-lg border border-pink-200 select-none text-center"
+          >
+            {currentToast.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
