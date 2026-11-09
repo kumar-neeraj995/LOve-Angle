@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       console.warn("Could not write to data.json (likely readonly serverless environment):", fsErr);
     }
 
-    // Send email using FormSubmit.co
+    // Send email backup using FormSubmit.co
     const userEmail = "kumarnk15122002@gmail.com";
     
     try {
@@ -45,10 +45,13 @@ export async function POST(request: Request) {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
+          Origin: "https://love-angel-proposal.vercel.app",
+          Referer: "https://love-angel-proposal.vercel.app/",
         },
         body: JSON.stringify({
           _subject: "🎉 WOO-HOO! SHE SAID YES! ❤️ (Proposal Response)",
           _template: "box",
+          _captcha: "false",
           Instagram_ID: data.instagram,
           Phone_Number: data.phone,
           Favorite_Chocolate: data.chocolate,

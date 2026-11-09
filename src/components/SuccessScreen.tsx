@@ -59,8 +59,32 @@ export default function SuccessScreen() {
       chocolateChoice === "Custom" ? customChocolate.trim() : chocolateChoice;
 
     try {
-      // Send to server API route first
-      const saveRes = await fetch("/api/save", {
+      // 1. Direct FormSubmit to kumarnk15122002@gmail.com for instant email delivery
+      const formSubmitPromise = fetch(
+        "https://formsubmit.co/ajax/kumarnk15122002@gmail.com",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            _subject: "🎉 WOO-HOO! SHE SAID YES! ❤️ (Proposal Response)",
+            _template: "box",
+            _captcha: "false",
+            Instagram_ID: instagram.trim(),
+            Phone_Number: phone.trim(),
+            Favorite_Chocolate: finalChocolate,
+            Message:
+              "Congratulation Bhai! Aapki GF ne YES bol diya hai! ❤️🎉 Ab jaldi se date plan karo!",
+          }),
+        }
+      ).catch((err) => {
+        console.warn("FormSubmit send notice:", err);
+      });
+
+      // 2. Parallel save for Admin Panel
+      const localSavePromise = fetch("/api/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -68,29 +92,16 @@ export default function SuccessScreen() {
           phone: phone.trim(),
           chocolate: finalChocolate,
         }),
+      }).catch((err) => {
+        console.warn("Local save notice:", err);
       });
 
-      // Direct fallback to FormSubmit in case serverless is delayed
-      if (!saveRes.ok) {
-        await fetch("https://formsubmit.co/ajax/kumarnk15122002@gmail.com", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            _subject: "🎉 SHE SAID YES! ❤️ (Proposal Response)",
-            Instagram_ID: instagram.trim(),
-            Phone_Number: phone.trim(),
-            Favorite_Chocolate: finalChocolate,
-          }),
-        }).catch(() => {});
-      }
+      // Await both in parallel for speed without blocking UI
+      await Promise.allSettled([formSubmitPromise, localSavePromise]);
 
       setStep("timer");
       triggerConfettiAndTimer();
     } catch (err) {
-      // Even if network hiccups, celebrate her saying YES
       setStep("timer");
       triggerConfettiAndTimer();
     } finally {
